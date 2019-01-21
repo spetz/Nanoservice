@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -27,7 +29,8 @@ namespace Nanoservice
 
                 services.AddRouting()
                     .AddHttpClient()
-                    .Configure<AppOptions>(configuration.GetSection("app"));
+                    .Configure<AppOptions>(configuration.GetSection("app"))
+                    .AddHealthChecks().AddCheck<DelayedHealthCheck>("delayed");
             })
             .Configure(app =>
             {
@@ -39,6 +42,7 @@ namespace Nanoservice
                 var nextServiceUrl = GetOption(nameof(appOptions.NextServiceUrl), appOptions.NextServiceUrl);
 
                 app.UseDeveloperExceptionPage();
+                app.UseHealthChecks("/health");
                 app.UseRouter(router =>
                 {
                     router.MapGet("", (request, response, data) => response.WriteAsync(message));
@@ -67,6 +71,28 @@ namespace Nanoservice
             public string Message { get; set; }
             public string File { get; set; }
             public string NextServiceUrl { get; set; }
+            public int HealthCheckDelay { get; set; }
+        }
+
+        private class DelayedHealthCheck : IHealthCheck
+        {
+            private readonly IOptions<AppOptions> _appOptions;
+
+            public DelayedHealthCheck(IOptions<AppOptions> appOptions)
+            {
+                _appOptions = appOptions;
+            }
+
+            public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context,
+                CancellationToken cancellationToken = new CancellationToken())
+            {
+                var delay = int.Parse(GetOption(nameof(_appOptions.Value.HealthCheckDelay),
+                    _appOptions.Value.HealthCheckDelay.ToString()));
+
+                await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
+
+                return HealthCheckResult.Healthy("ok");
+            }
         }
     }
 }
