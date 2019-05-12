@@ -1,9 +1,9 @@
-FROM microsoft/dotnet:2.2-sdk AS build
+FROM mcr.microsoft.com/dotnet/core/sdk AS build
 WORKDIR /build
 COPY . .
 RUN dotnet publish src/Nanoservice -c release -o out
 
-FROM microsoft/dotnet:2.2-aspnetcore-runtime
+FROM mcr.microsoft.com/dotnet/core/aspnet:2.2
 WORKDIR /app
 COPY --from=build /build/src/Nanoservice/out .
 ENV ASPNETCORE_ENVIRONMENT docker
